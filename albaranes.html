@@ -770,12 +770,22 @@ function generateLabels() {
 
 // ═══════════════════ HOLDED ═══════════════════
 let holdedKey = '';
+
+// Auto-load saved key
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('dk_holded_key');
+  if (saved) {
+    document.getElementById('holdedApiKey').value = saved;
+    connectHolded();
+  }
+});
 let ordersData = [];
 let selectedOrders = new Set();
 
 async function connectHolded() {
   holdedKey = document.getElementById('holdedApiKey').value.trim();
   if (!holdedKey) return;
+  localStorage.setItem('dk_holded_key', holdedKey);
   const status = document.getElementById('holdedStatus');
   status.className = 'holded-status loading';
   status.textContent = '⟳ Conectando con Holded...';
