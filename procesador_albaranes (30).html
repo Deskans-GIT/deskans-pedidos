@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Procesador Albaranes · Deskans</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #0b0c0f;
+  --surface: #13151a;
+  --surface2: #1a1d24;
+  --border: #22252e;
+  --border2: #2e3240;
+  --accent: #e8ff47;
+  --accent-dim: rgba(232,255,71,0.12);
+  --accent2: #47c8ff;
+  --text: #dde0ec;
+  --muted: #525870;
+  --muted2: #7a80a0;
+  --error: #ff5a6e;
+  --success: #3fffa8;
+  --warn: #ffbb47;
+  --r: 10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;min-height:100vh;padding:40px 20px 100px}
+body::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");pointer-events:none;z-index:9999}
+.app{max-width:800px;margin:0 auto;position:relative}
+
+/* HEADER */
+.header{margin-bottom:44px}
+.badge{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#0b0c0f;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;padding:4px 10px;border-radius:4px;margin-bottom:12px}
+h1{font-size:clamp(30px,7vw,52px);font-weight:800;line-height:1.02;letter-spacing:-.025em}
+h1 em{font-style:normal;color:var(--accent)}
+.tagline{font-size:12px;color:var(--muted2);margin-top:10px;letter-spacing:.03em}
+
+/* TABS */
+.tabs{display:flex;gap:2px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:4px;margin-bottom:24px}
+.tab{flex:1;padding:9px;text-align:center;font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;transition:background .15s,color .15s;color:var(--muted2)}
+.tab.active{background:var(--surface2);color:var(--text)}
+.tab:hover:not(.active){color:var(--text)}
+
+/* PANELS */
+.panel{display:none}.panel.active{display:block}
+
+/* DROP ZONE */
+.drop-zone{border:2px dashed var(--border2);border-radius:var(--r);padding:50px 28px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;background:var(--surface);position:relative;margin-bottom:20px}
+.drop-zone:hover,.drop-zone.over{border-color:var(--accent);background:#151720}
+.drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop-icon{font-size:36px;display:block;margin-bottom:10px}
+.drop-label{font-size:15px;font-weight:600;margin-bottom:5px}
+.drop-hint{font-size:11px;color:var(--muted)}
+.file-name{font-size:12px;color:var(--accent);margin-top:10px}
+
+/* SECTION LABEL */
+.section-label{font-size:10px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+
+/* RULES */
+.rules-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.rule-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;transition:border-color .2s}
+.rule-card:hover{border-color:var(--border2)}
+.rule-card.active-edit{border-color:var(--accent)}
+.rule-card.disabled-rule{opacity:.4}
+.rule-header{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;user-select:none}
+.rule-num{font-size:10px;background:var(--border);color:var(--accent);border-radius:4px;padding:3px 8px;flex-shrink:0}
+.rule-text{flex:1;font-size:13px;color:var(--text);line-height:1.4}
+.rule-badge{font-size:10px;padding:2px 7px;border-radius:4px;flex-shrink:0}
+.rule-badge.multiply{background:rgba(71,200,255,.13);color:var(--accent2)}
+.rule-badge.delete{background:rgba(255,90,110,.13);color:var(--error)}
+.rule-badge.blank{background:rgba(255,187,71,.13);color:var(--warn)}
+.rule-badge.skip{background:rgba(60,65,90,.4);color:var(--muted2)}
+.rule-badge.custom{background:rgba(232,255,71,.13);color:var(--accent)}
+.rule-actions{display:flex;gap:6px;flex-shrink:0}
+.rule-btn{background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;border-radius:4px;transition:background .15s;color:var(--muted2);line-height:1}
+.rule-btn:hover{background:var(--border);color:var(--text)}
+.rule-btn.danger:hover{background:rgba(255,90,110,.15);color:var(--error)}
+.rule-body{padding:0 14px 14px;display:none}
+.rule-card.active-edit .rule-body{display:block}
+.rule-body textarea{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--text);resize:vertical;min-height:52px;outline:none;transition:border-color .15s;line-height:1.6}
+.rule-body textarea:focus{border-color:var(--accent)}
+.rule-body-actions{display:flex;gap:8px;margin-top:8px;justify-content:flex-end;flex-wrap:wrap}
+
+/* BUTTONS */
+.btn-sm{padding:6px 14px;font-size:12px;font-weight:600;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;border-radius:6px;border:none;cursor:pointer;transition:opacity .15s,transform .15s}
+.btn-sm:hover{opacity:.85;transform:translateY(-1px)}
+.btn-sm.primary{background:var(--accent);color:#0b0c0f}
+.btn-sm.ghost{background:var(--border2);color:var(--muted2)}
+.btn-main{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;background:var(--accent);color:#0b0c0f;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;font-weight:700;border:none;border-radius:var(--r);cursor:pointer;transition:transform .15s,box-shadow .15s,opacity .15s;margin-top:20px}
+.btn-main:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 36px rgba(232,255,71,.28)}
+.btn-main:disabled{opacity:.3;cursor:not-allowed}
+.btn-download{background:transparent;color:var(--accent);border:2px solid var(--accent);margin-top:10px}
+.btn-download:hover{background:var(--accent-dim)}
+
+/* STATUS */
+.interpret-status{font-size:11px;margin-top:8px;min-height:16px;color:var(--muted2)}
+.interpret-status.ok{color:var(--success)}
+.interpret-status.err{color:var(--error)}
+.interpret-status.loading{color:var(--warn)}
+
+/* ADD RULE BOX */
+.add-rule-box{background:var(--surface);border:1px dashed var(--border2);border-radius:var(--r);padding:16px 18px}
+.add-rule-input{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--text);resize:none;min-height:60px;outline:none;transition:border-color .15s;line-height:1.6;margin-bottom:10px}
+.add-rule-input:focus{border-color:var(--accent)}
+.add-rule-input::placeholder{color:var(--muted)}
+.add-rule-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.add-rule-hint{font-size:11px;color:var(--muted);flex:1}
+
+/* EXAMPLES */
+.examples{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.example-chip{font-size:10px;background:var(--border);color:var(--muted2);padding:4px 10px;border-radius:20px;cursor:pointer;border:none;transition:background .15s,color .15s}
+.example-chip:hover{background:var(--border2);color:var(--text)}
+
+/* PROGRESS */
+.progress{height:2px;background:var(--border);border-radius:2px;margin:14px 0;overflow:hidden;display:none}
+.progress.on{display:block}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0%;transition:width .35s ease}
+
+/* LOG */
+.log-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;margin-top:18px;display:none}
+.log-box.on{display:block}
+.log-entry{font-size:12px;line-height:1.9;display:flex;gap:8px}
+.log-entry.ok{color:var(--success)}.log-entry.info{color:var(--accent2)}.log-entry.warn{color:var(--warn)}.log-entry.err{color:var(--error)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+.stat{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}
+.stat-v{font-size:28px;font-weight:800;color:var(--accent);line-height:1;margin-bottom:4px}
+.stat-l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+
+/* RUN SUMMARY */
+.run-summary{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;margin-bottom:16px;font-size:12px;color:var(--muted2);line-height:1.9}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{display:inline-block;width:11px;height:11px;border:2px solid transparent;border-top-color:currentColor;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:4px}
+
+/* LABELS */
+@media print {
+  body { background: white !important; padding: 0 !important; margin: 0 !important; }
+  body::after { display: none !important; }
+  .app { max-width: none !important; }
+  .app > *:not(#tab-labels) { display: none !important; }
+  #tab-labels { display: block !important; padding: 0 !important; }
+  .no-print { display: none !important; }
+  .section-label { display: none !important; }
+  #labelCountInfo { display: none !important; }
+  .label-options { display: none !important; }
+  .label-preview-area { border: none !important; padding: 0 !important; background: white !important; margin: 0 !important; }
+  .label-sheet { box-shadow: none !important; margin: 0 !important; page-break-after: always; }
+}
+.label-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.label-opt { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; }
+.label-opt label { font-size: 11px; color: var(--muted2); display: block; margin-bottom: 6px; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+.label-opt input, .label-opt select { width: 100%; background: var(--bg); border: 1px solid var(--border2); border-radius: 6px; padding: 8px 10px; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px; color: var(--text); outline: none; }
+.label-opt input:focus, .label-opt select:focus { border-color: var(--accent); }
+.label-preview-area { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 20px; margin-top: 16px; min-height: 200px; }
+.label-sheet { width: 210mm; min-height: 297mm; background: white; margin: 0 auto 20px; box-shadow: 0 4px 40px rgba(0,0,0,.5); padding: 10mm 5.5mm 10mm 5.5mm; display: grid; grid-template-columns: 1fr 1fr; gap: 0; box-sizing: border-box; }
+.label-cell { width: 99.1mm; height: 93.1mm; box-sizing: border-box; padding: 5mm 6mm 4mm 6mm; display: flex; flex-direction: column; justify-content: space-between; border: 0.2mm dashed #ccc; page-break-inside: avoid; }
+.label-cell.empty { border: 0.2mm dashed #eee; }
+.lbl-top-row { display: flex; align-items: center; gap: 3mm; margin-bottom: 2mm; }
+.lbl-logo { height: 10mm; width: auto; object-fit: contain; }
+.lbl-company { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 8pt; font-weight: 700; color: #888; letter-spacing: .08em; text-transform: uppercase; }
+.lbl-contact { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 15pt; font-weight: 800; color: #111; line-height: 1.2; margin-bottom: 2mm; }
+.lbl-desc-label { font-weight: 700; color: #333; }
+.lbl-desc { font-family: system-ui,-apple-system,"Segoe UI",sans-serif; font-size: 8.5pt; color: #555; font-style: italic; margin-bottom: 1.5mm; line-height: 1.3; }
+.lbl-item { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 10.5pt; color: #222; line-height: 1.45; flex: 1; overflow: hidden; font-weight: 500; }
+.lbl-footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 3mm; padding-top: 2.5mm; border-top: 0.5mm solid #bbb; }
+.lbl-albaran { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 9pt; color: #444; font-weight: 700; }
+.lbl-fecha { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 9pt; color: #666; }
+.lbl-units { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 26pt; font-weight: 800; color: #111; line-height: 1; }
+.lbl-units-label { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 8pt; color: #777; text-transform: uppercase; font-weight: 600; letter-spacing: .05em; }
+.lbl-right { text-align: right; }
+.label-count-info { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 11px; color: var(--muted2); margin-bottom: 12px; }
+
+/* HOLDED */
+.holded-key-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 16px 18px; margin-bottom: 16px; }
+.holded-key-row { display: flex; gap: 10px; align-items: center; }
+.holded-key-input { flex: 1; background: var(--bg); border: 1px solid var(--border2); border-radius: 6px; padding: 10px 12px; font-family: monospace; font-size: 13px; color: var(--text); outline: none; transition: border-color .15s; letter-spacing: .04em; }
+.holded-key-input:focus { border-color: var(--accent); }
+.holded-status { font-family: monospace; font-size: 11px; margin-top: 8px; min-height: 16px; }
+.holded-status.ok { color: var(--success); }
+.holded-status.err { color: var(--error); }
+.holded-status.loading { color: var(--warn); }
+.orders-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; max-height: 420px; overflow-y: auto; }
+.order-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: border-color .15s; }
+.order-card:hover { border-color: var(--border2); }
+.order-card.selected { border-color: var(--accent); background: var(--accent-dim); }
+.order-check { width: 18px; height: 18px; border: 2px solid var(--border2); border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; transition: background .15s, border-color .15s; }
+.order-card.selected .order-check { background: var(--accent); border-color: var(--accent); color: #0b0c0f; }
+.order-info { flex: 1; }
+.order-num { font-size: 13px; font-weight: 700; color: var(--text); }
+.order-contact { font-size: 12px; color: var(--muted2); margin-top: 2px; }
+.order-meta { font-family: monospace; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.order-amount { font-size: 14px; font-weight: 700; color: var(--accent); flex-shrink: 0; }
+.orders-toolbar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+.select-all-btn { font-family: monospace; font-size: 11px; background: var(--border); color: var(--muted2); padding: 4px 10px; border-radius: 4px; border: none; cursor: pointer; }
+.select-all-btn:hover { color: var(--text); }
+.orders-count { font-family: monospace; font-size: 11px; color: var(--muted); flex: 1; }
+.convert-result { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 18px; margin-top: 12px; display: none; }
+.convert-result.on { display: block; }
+.convert-entry { font-family: monospace; font-size: 12px; line-height: 1.9; display: flex; gap: 8px; }
+.convert-entry.ok { color: var(--success); }
+.convert-entry.err { color: var(--error); }
+</style>
+</head>
+<body>
+<img id="logoImg" src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAB3AHgDASIAAhEBAxEB/8QAGwAAAQUBAQAAAAAAAAAAAAAABgADBAUHAQL/xABDEAABBAEBAwYJCAkFAQAAAAABAAIDBBEFBhIhEzFBUXGRIjJCYYGhscHRFBUjUmJyc5IHFiQzNVSy4fBDRFNjgpP/xAAaAQACAwEBAAAAAAAAAAAAAAAAAwIEBQEG/8QAKBEAAgICAQMDBAMBAAAAAAAAAAECAwQRMQUSIRMUQSMyUWEVcYGx/9oADAMBAAIRAxEAPwCyn2g1OWVz2WDE0ngxrRwHckzaDVWf7kO+8wH3JrVaZpanNDjwCd5n3T/mFF3VIS20XkG1dphAnrxSDraS0+9WtXabT58CUvgd/wBg4d4QfurhYjR1TYa6/qgobPW9QrPY9zGfRkEEbxOB6ysggsW22TaZanbYccmVryHE9qvNXDxpVhrXODTguAPA4IVHX4qIyL2Emn7aa3T3W2THdjH/ACDdd+Ye8Ioobd6RYAFsS039PKN3m/mCBIow4AYXs0g7oQdNVrapp9sA1r1eXP1ZAT3KWCCMjisbdpocc7o7l1unyt8R8jexxCANic5rRlxAHnOFAt67pNMftGo1mHq5QE9w4rLTpj3+OXO+8SV7j0trfIA9CADC/t9SjBbp1aa0/oc4cmz18fUhm/tVr11pHyhtVh8mu3dP5jkpr5G1gzhRLWGg4QA7sry7tr6BZLIXukJe7eOXN3STnrSVv+jmiZ9ZsX3DwK0e40/ad/YHvSQAV7V0+VpstMHhwHwvun4HCF2cVok0TJoXxSDLHtLSPMVnr4nVrMld/jRuLT6F1Cpr5O7qW4nWjIXrdUhZDs1+XrSxY8dpahGuS07rhgjge1a1oVKtPRL5oGPdyhGXDPDgpB2c0Uvc86XV3nHJPJjiVFjoLwZlWPMrSEAt4hHjdB0hvi6dWH/he/mbTBzUoR2NwuEwFwB0LqNJNA0144QFh62vIVbb2YIBdTnz9iT4hAA6knJ4Ja0pinjcx45wVHlfuNKAGrcga3GVRXJC5260FzicADnJUq5Y5+KutgtEN/UDqtlua9Z2IgfLk6+we3sQAY7LaT8zaJDWeByzvpJiPrnnHo4D0JK4SQB1Bu1EIh1cSAcJmB3pHD4IyQttjjlaf1sP7uC6iM+CoiPBSGtyokJU2PiFIrsItAGKDvxD7lLv3q2m0327knJwsxvOwTjJwOZRtCGKJ++fcoG3YzsnbHnZ/WFF8liHBIr7U6LZlZFBc3nvcGtHJuGSfQrhZDoDcapS/HZ7QtYu2oqVSSzO7djjGT8FwkNXNTpUZGx2ZwxzhkDBPD0LlTVaV2Xkq0xe/GSA0jA7lnd3UJb1ySxJxfI7g0ccdQCO9ntM+bqA5UftEuHSebqb6EASdT06LUKxjeN148R/S0/BZ3fjkrzSQTN3ZGHBC1FBm3VQRugvMHj/AEb+3nHvQAExVJNQ1WvRjO66eQM3uodJ9Aytho1IKFOKrWZuRRNDWj/OlZTpVllLaCjbkOGRygPPUDwJ9a10cyAOpJJIA4gnaa18p1csafBgbuennP8AnmRdftNp0prDv9NpIHWegd6z1pdI8vecucck9ZXUQm/A/EQ0ZJwB1p1t+qzg6UegEqBeDuTZjxc8e1RQxaeNhwsh3yZrYPS676vUnLn8GhbPTx2KBdC7eaJCM47FH21G9svaA48Wf1BeNjBjSZPxj7ApG1YzoM/a32hUp1r1uxcbKsqIxyPRT8b0ZzoxI1akMH9+znH2giDbPWDaufN9Yl0UBzIR5T+r0e1VtCPN+uMkZlbzdqd1TTpKF+SCTLhnLXHygelXPY1qfa5Gj/F1q1Qc/jZYbGaO6xa+cLTfo4TiIHyndfo9qO0NbJagH1/kEuA+LjH9pvxCJlQuh2TcTLyKvStcBKg22jD9mbD+mJzHj8wHvV+qPbMOOyt9rGuc4saAGjJPhBLEmUyvBGCtN2G1k6po4hldmxUxG8nnc3yXd3D0LLPk9txwK02fuELRf0faDY06GXULbmh1pjQyNrs4aDnJ8/mQAZpJJIAGtsLWIoKjTxed93YOb1+xDkQU3aGbl9bn48I8Rj0Dj6yVFjHMpITJ+R0wiWIxu6Rz9SrWsLSWuGHNOCriNV9zDb7wOkAntwr+HN+Y/wCmz0W6SnKr45CzZEY0p/4p9gUjaYZ0SYedvtCZ2U/hb/xT7ApWvsdLpMrGNLnEt4AZ6VUlL62/2Jsestv9gVQZ+31/xW+1GGv6YL9MuYPp4uLPP1hDtOnYFyAmCUASNOSw9aN+dMuubkpL4LPUL9WxnB8GcQPkrTsmiJbIw5BR9ptxl6oydnDPBzfqnpCH9f0p7LXyitE5zJT4TWjOHf3TGiTWqF0B9ebkJTh/gHgegrtjVsd/JPK7MmpWRflBiqzX340/c6XuA7uKsweCodYnE0+405bHw9PSqqMOb0gcmYrjZXUOTldQlPguy6LzHpHv71XTNUMufDK2WI4exwc09RC6xcXpmjJJijabcpxWGc0jc46j0jvSUR4AW3b9+w89Mrj6yvca8XIzDqFiN3O2Vw9aTHKSEMkOlbDEZH8w9arGudLM6V/O45XqzKZpAweI31lOwx8y1aoKivulyz1HTcX29XfL7pf8DDZX+Fu/FPsCusIT0zVHafWMIhD8uLsl2FL/AFjk/lWfnPwWVN7k2ZuRi2ztlJLwwhSQ9+scn8sz85+CR2jk6KzPzlRFezu/AQ4XHEDiTwCGpdobRH0cUTe3JVNf1G7bBbNYcWHyRwHcE2upzetja+nWzfnwXmq7SwxTtq1HB5cd18g5m9nWVB5XPShuVvUrCGaQ12yua4NPDexwJ7VbyMaNUIyiHU8BUQjKH+k6Q5ChTBOCYEc68POVSMdF/shazHPUcfEPKN7Dz+v2pKs2cl5LXIhnhI1zD3Z9ySgx8X4LPaHQ5rFn5ZSbvvcMSMzgnHSFQXqFyjUE1lgi3jutaXAuJ7AtDQPtjZM2qx1wfBgZzec/2wrOJD1LUnwXMHHV16T45KaBisIWgBQ48BOGcN6VcyYysekensTfhE1cUE2snDck9Q4pxkd2T93UsO7Iyq3s5fL0JcEuXolZHWlkdajmtqI56Vn/AOZTL3TxfvYpWfeYQurEb4ZxKL4kiaXDHOo8qYbYB5ivRlDulMhjygxqg0MyhEexU4c23Tfgt4PAPEdR9yHJCrjYx2NZkA6YT7Qrd8e7HlsVnx7saWwks7PadPktiMLj0xHHq5lT29mLUYLqsrZh9V3gu+CLV1YezybimB+j6LqDNThnmh5KOJ28S4jj5hhJGCSDqWjh5lnG0G+Nft7w4l/DswMJJLQ6c/qP+jV6S9XP+iXS2d1C2xr3GOGM9LnZPcFe09lKMIDrLn2H9O8cN7gkkk3ZVrbW9CsjOvnJx3pfouIKdau3EEEcY+y0BP4SSVZtvkott8iXC0HnGe1JJcOEG1o2nW88tVj3j5TRunvCormyGCXUbWPsSjPrCSSdDIshwyxVl3VfbIHtQo29Pk3LUYaTzEOBBRDsVRcBLffjDxuMGejpKSS0L7pPFT/Jq5WROeGm/kLUkklkmEJJJJAH/9k=" style="display:none" alt="logo">
+<div class="app">
+
+  <div class="header">
+    <div class="badge">⚡ Deskans</div>
+    <h1>Procesador de<br><em>Albaranes</em></h1>
+    <p class="tagline">// Reglas en lenguaje natural · IA integrada · Holded</p>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('upload')">① Archivo</div>
+    <div class="tab" onclick="switchTab('rules')">② Reglas</div>
+    <div class="tab" onclick="switchTab('run')">③ Procesar</div>
+    <div class="tab" onclick="switchTab('labels')">④ Etiquetas</div>
+    <div class="tab" onclick="switchTab('holded')">⑤ Holded</div>
+  </div>
+
+  <!-- TAB UPLOAD -->
+  <div class="panel active" id="tab-upload">
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept=".xlsx,.xls">
+      <span class="drop-icon">📂</span>
+      <div class="drop-label">Arrastra el Excel aquí o haz clic</div>
+      <div class="drop-hint">.xlsx · exportación Holded</div>
+      <div class="file-name" id="fileName"></div>
+    </div>
+    <button class="btn-main" id="toRulesBtn" disabled onclick="switchTab('rules')">Siguiente → Configurar reglas</button>
+  </div>
+
+  <!-- TAB RULES -->
+  <div class="panel" id="tab-rules">
+    <div class="section-label" style="margin-bottom:14px">Reglas activas — arrastra para reordenar</div>
+    <div class="rules-list" id="rulesList"></div>
+
+    <div class="add-rule-box">
+      <div class="section-label" style="margin-bottom:8px">➕ Añadir regla en lenguaje natural</div>
+      <div class="section-label" style="margin-bottom:6px;color:var(--muted2)">Ejemplos rápidos:</div>
+      <div class="examples" id="examplesRow"></div>
+      <textarea class="add-rule-input" id="newRuleInput" placeholder="Ej: Si el item contiene &quot;Hugo&quot;, duplicar x4 y poner 1 en columna P&#10;Ej: Eliminar filas donde columna A esté vacía&#10;Ej: Si columna P mayor que 10, poner columna D en blanco&#10;Ej: Si item contiene &quot;Base&quot; Y columna P mayor que 2, duplicar x2"></textarea>
+      <div class="add-rule-footer">
+        <span class="add-rule-hint">La IA interpreta tu descripción y genera la lógica automáticamente</span>
+        <button class="btn-sm primary" id="addRuleBtn" onclick="addRule()">Interpretar y añadir</button>
+      </div>
+      <div class="interpret-status" id="interpretStatus"></div>
+    </div>
+
+    <button class="btn-main" onclick="switchTab('run')">Siguiente → Procesar</button>
+  </div>
+
+  <!-- TAB RUN -->
+  <div class="panel" id="tab-run">
+    <div class="section-label" style="margin-bottom:10px">Resumen de ejecución</div>
+    <div class="run-summary" id="runSummary"></div>
+    <button class="btn-main" id="processBtn" onclick="processFile()">⚙ Ejecutar procesamiento</button>
+    <div class="progress" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="log-box" id="logBox">
+      <div class="section-label" style="margin-bottom:10px">Registro</div>
+      <div id="logEntries"></div>
+      <div class="stats" id="statsGrid" style="display:none"></div>
+      <button class="btn-main btn-download" id="downloadBtn" style="display:none" onclick="downloadFile()">⬇ Descargar Excel procesado</button>
+      <button class="btn-main" id="goLabelsBtn" style="display:none;margin-top:8px;background:var(--accent2);color:#0b0c0f" onclick="switchTab('labels');generateLabels()">🏷 Ir a Etiquetas →</button>
+    </div>
+  </div>
+
+
+  <!-- TAB LABELS -->
+  <div class="panel" id="tab-labels">
+    <div class="section-label" style="margin-bottom:14px">Generador de etiquetas · Apli 02421 (99,1 × 93,1 mm · 6 por hoja)</div>
+
+    <div class="label-options no-print">
+      <div class="label-opt">
+        <label>Empresa (texto superior)</label>
+        <input type="text" id="lbl-company" value="Deskans">
+      </div>
+      <div class="label-opt">
+        <label>Fuente de datos</label>
+        <select id="lbl-source">
+          <option value="processed">Excel procesado (resultado paso ③)</option>
+          <option value="original">Excel original cargado</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+      <button class="btn-main" style="margin-top:0;flex:1" onclick="generateLabels()">🏷 Generar etiquetas</button>
+      <button class="btn-main btn-download" style="margin-top:0;flex:1" onclick="window.print()">🖨 Imprimir</button>
+    </div>
+
+    <div class="label-count-info" id="labelCountInfo"></div>
+    <div class="label-preview-area" id="labelPreview">
+      <div style="text-align:center;color:var(--muted);font-size:12px;padding:40px 0">
+        Procesa el Excel en el paso ③ y pulsa "Generar etiquetas"
+      </div>
+    </div>
+  </div>
+
+
+  <!-- TAB HOLDED -->
+  <div class="panel" id="tab-holded">
+    <div class="section-label" style="margin-bottom:14px">Conexión con Holded · Convertir pedidos en albaranes</div>
+
+    <div class="holded-key-box">
+      <div class="section-label" style="margin-bottom:8px">🔑 API Key de Holded</div>
+      <div class="holded-key-row">
+        <input class="holded-key-input" type="password" id="holdedApiKey" placeholder="Introduce tu API Key de Holded...">
+        <button class="btn-sm primary" onclick="connectHolded()">Conectar</button>
+      </div>
+      <div class="holded-status" id="holdedStatus"></div>
+    </div>
+
+    <div id="holdedOrdersSection" style="display:none">
+      <div class="section-label" style="margin-bottom:10px">Pedidos pendientes</div>
+      <div class="orders-toolbar">
+        <button class="select-all-btn" onclick="toggleSelectAll()">Seleccionar todos</button>
+        <span class="orders-count" id="ordersCount"></span>
+        <button class="btn-sm ghost" onclick="loadOrders()">↻ Actualizar</button>
+      </div>
+      <div class="orders-list" id="ordersList"></div>
+      <button class="btn-main" id="convertBtn" onclick="convertOrders()" disabled>
+        📦 Convertir seleccionados en albarán
+      </button>
+      <div class="convert-result" id="convertResult"></div>
+    </div>
+  </div>
+
+</div>
+<script>
+// ═══════════════════ STATE ═══════════════════
+let uploadedFile = null;
+let workbookResult = null;
+let outputFilename = '';
+let editingId = null;
+let nextId = 100;
+
+const EXAMPLES = [
+  'Eliminar filas donde columna A esté vacía',
+  'Si item contiene "Mueble", duplicar x2 y P=1',
+  'Si columna P > 5, vaciar columna D',
+  'Eliminar filas que contengan "CANCELADO"',
+  'Si item contiene "Cama" Y "120", duplicar x3'
+];
+
+const DEFAULT_RULES = [
+  { id:1, text:'Eliminar las 3 primeras filas', type:'delete', badge:'eliminar', enabled:true,
+    fn:`(rows) => rows.slice(3)` },
+  { id:8, text:'Eliminar la fila inmediatamente anterior a la fila que contiene "Informe creado"', type:'delete', badge:'eliminar -1', enabled:true,
+    fn:`(rows) => {
+  const out=[];
+  for(let i=0;i<rows.length;i++){
+    const next=rows[i+1];
+    if(next && next.some(c=>c!=null&&String(c).includes('Informe creado'))){continue;}
+    out.push(rows[i]);
+  }
+  return out;
+}` },
+  { id:2, text:'Eliminar la fila que contenga "Informe creado"', type:'delete', badge:'eliminar', enabled:true,
+    fn:`(rows) => rows.filter(r => !r.some(c => c != null && String(c).includes('Informe creado')))` },
+  { id:3, text:'Dejar en blanco todas las celdas de la columna D', type:'blank', badge:'vaciar col D', enabled:true,
+    fn:`(rows) => rows.map(r => { const nr=[...r]; if(nr.length>3) nr[3]=null; return nr; })` },
+  { id:4, text:'Si item (col L) contiene "Cajón": duplicar ×3 por cada unidad de col P y poner P=1', type:'multiply', badge:'cajón ×3', enabled:true,
+    fn:`(rows) => {
+  const out=[];
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];
+    if(i===0){out.push(r);continue;}
+    const item=r[11]!=null?String(r[11]):'';
+    const p=Math.max(1,parseInt(r[15])||1);
+    if(item.includes('Cajón')){const total=p*3;for(let n=0;n<total;n++){const nr=[...r];nr[15]=(n+1)+'/'+total;out.push(nr);}}
+    else{out.push(r);}
+  }
+  return out;
+}` },
+  { id:5, text:'Si item (col L) contiene "Tapa partida", "Sofá cama", "Hugo" o "PIN090190": duplicar ×2 por cada unidad de col P y poner P=1', type:'multiply', badge:'r5 ×2', enabled:true,
+    fn:`(rows) => {
+  const kw=['Tapa partida','Sofá cama','Hugo','PIN090190'];
+  const out=[];
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];
+    if(i===0){out.push(r);continue;}
+    const item=r[11]!=null?String(r[11]):'';
+    const p=Math.max(1,parseInt(r[15])||1);
+    if(kw.some(k=>item.includes(k))){const total=p*2;for(let n=0;n<total;n++){const nr=[...r];nr[15]=(n+1)+'/'+total;out.push(nr);}}
+    else{out.push(r);}
+  }
+  return out;
+}` },
+  { id:6, text:'Si item (col L) contiene "Accesorios", "Almohada" o "despiece": no hacer nada (la fila se preserva tal cual)', type:'skip', badge:'sin cambio', enabled:true,
+    fn:`(rows) => rows` },
+  { id:7, text:'Resto de filas (sin "Cajón", "Tapa partida", "Sofá cama", "Hugo", "PIN090190" ni "Accesorios"): duplicar exactamente P veces y poner P=1', type:'multiply', badge:'resto ×P', enabled:true,
+    fn:`(rows) => {
+  const excl=['Cajón','Tapa partida','Sofá cama','Hugo','PIN090190','Accesorios','Almohada','despiece'];
+  const out=[];
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];
+    if(i===0){out.push(r);continue;}
+    const item=r[11]!=null?String(r[11]):'';
+    if(excl.some(k=>item.includes(k))){out.push(r);continue;}
+    const p=Math.max(1,parseInt(r[15])||1);
+    for(let n=0;n<p;n++){const nr=[...r];nr[15]=1;out.push(nr);}
+  }
+  return out;
+}` },
+  { id:9, text:'Ordenar de Z a A por la columna A (descendente), manteniendo la cabecera en primera posición', type:'custom', badge:'orden Z→A', enabled:true,
+    fn:`(rows) => {
+  if(rows.length<=1) return rows;
+  const header=rows[0];
+  const data=rows.slice(1);
+  data.sort((a,b)=>{
+    const va=a[0]!=null?String(a[0]):'';
+    const vb=b[0]!=null?String(b[0]):'';
+    return vb.localeCompare(va,'es',{sensitivity:'base'});
+  });
+  return [header,...data];
+}` }
+
+];
+
+let rules = JSON.parse(JSON.stringify(DEFAULT_RULES));
+
+// ═══════════════════ TABS ═══════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['upload','rules','run','labels','holded'][i]===name));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if(name==='run') updateRunSummary();
+}
+
+// ═══════════════════ FILE ═══════════════════
+const dropZone=document.getElementById('dropZone');
+const fileInput=document.getElementById('fileInput');
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('over');});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('over'));
+dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('over');if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0]);});
+fileInput.addEventListener('change',()=>{if(fileInput.files[0])loadFile(fileInput.files[0]);});
+
+function loadFile(file){
+  uploadedFile=file;
+  outputFilename=file.name.replace(/\.xlsx?$/i,'')+'_procesado.xlsx';
+  document.getElementById('fileName').textContent='✓ '+file.name;
+  document.getElementById('toRulesBtn').disabled=false;
+  workbookResult=null;
+  document.getElementById('downloadBtn').style.display='none';
+}
+
+// ═══════════════════ RENDER RULES ═══════════════════
+const badgeClass={multiply:'multiply',delete:'delete',blank:'blank',skip:'skip',custom:'custom'};
+
+function renderRules(){
+  const list=document.getElementById('rulesList');
+  list.innerHTML='';
+  rules.forEach((rule,idx)=>{
+    const card=document.createElement('div');
+    card.className='rule-card'+(rule.enabled?'':' disabled-rule')+(editingId===rule.id?' active-edit':'');
+    card.innerHTML=`
+      <div class="rule-header" onclick="toggleEdit(${rule.id})">
+        <span class="rule-num">R${idx+1}</span>
+        <span class="rule-text">${escHtml(rule.text)}</span>
+        <span class="rule-badge ${badgeClass[rule.type]||'custom'}">${escHtml(rule.badge)}</span>
+        <div class="rule-actions" onclick="event.stopPropagation()">
+          <button class="rule-btn" title="Subir" onclick="moveRule(${rule.id},-1)">↑</button>
+          <button class="rule-btn" title="Bajar" onclick="moveRule(${rule.id},1)">↓</button>
+          <button class="rule-btn" title="${rule.enabled?'Desactivar':'Activar'}" onclick="toggleEnabled(${rule.id})">${rule.enabled?'⏸':'▶'}</button>
+          <button class="rule-btn danger" title="Eliminar" onclick="deleteRule(${rule.id})">✕</button>
+        </div>
+      </div>
+      <div class="rule-body">
+        <div class="section-label" style="margin-bottom:6px">Editar descripción (solo texto)</div>
+        <textarea id="rtxt-${rule.id}">${escHtml(rule.text)}</textarea>
+        <div class="section-label" style="margin-top:12px;margin-bottom:6px">Re-interpretar con IA — escribe la nueva versión</div>
+        <textarea id="rrewrite-${rule.id}" placeholder="Describe aquí cómo quieres modificar esta regla y pulsa Re-interpretar..."></textarea>
+        <div class="rule-body-actions">
+          <button class="btn-sm ghost" onclick="cancelEdit()">Cancelar</button>
+          <button class="btn-sm ghost" onclick="saveText(${rule.id})">Guardar texto</button>
+          <button class="btn-sm primary" onclick="reinterpretRule(${rule.id})">
+            <span class="spinner" id="spin-${rule.id}" style="display:none"></span>Re-interpretar con IA
+          </button>
+        </div>
+        <div class="interpret-status" id="istatus-${rule.id}"></div>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function toggleEdit(id){ editingId=editingId===id?null:id; renderRules(); }
+function cancelEdit(){ editingId=null; renderRules(); }
+function saveText(id){ const r=rules.find(r=>r.id===id); if(r){ r.text=document.getElementById('rtxt-'+id).value.trim(); } editingId=null; renderRules(); }
+function deleteRule(id){ if(!confirm('¿Eliminar esta regla?')) return; rules=rules.filter(r=>r.id!==id); editingId=null; renderRules(); }
+function toggleEnabled(id){ const r=rules.find(r=>r.id===id); if(r) r.enabled=!r.enabled; renderRules(); }
+function moveRule(id,dir){ const idx=rules.findIndex(r=>r.id===id); const ni=idx+dir; if(ni<0||ni>=rules.length) return; [rules[idx],rules[ni]]=[rules[ni],rules[idx]]; renderRules(); }
+
+// ═══════════════════ EXAMPLES ═══════════════════
+function renderExamples(){
+  const el=document.getElementById('examplesRow');
+  el.innerHTML='';
+  EXAMPLES.forEach(ex=>{
+    const btn=document.createElement('button');
+    btn.className='example-chip';
+    btn.textContent=ex;
+    btn.onclick=()=>{ document.getElementById('newRuleInput').value=ex; };
+    el.appendChild(btn);
+  });
+}
+
+// ═══════════════════ AI ═══════════════════
+const SYSTEM_PROMPT=`Eres un asistente experto en procesamiento de Excel para una empresa de distribución de colchones.
+El usuario describirá una regla en lenguaje natural. Devuelve SOLO un objeto JSON válido, sin markdown, sin backticks, sin texto adicional:
+
+{"text":"descripción legible para mostrar en UI","badge":"etiqueta corta máx 12 chars","type":"delete|blank|multiply|skip|custom","fn":"función JavaScript como string"}
+
+Reglas para escribir fn:
+- Es una función flecha que recibe (rows) — array de arrays — y devuelve el array modificado
+- Fila 0 es siempre la cabecera, preservarla salvo que la regla lo indique
+- Índices de columna: A=0,B=1,C=2,D=3,E=4,F=5,G=6,H=7,I=8,J=9,K=10,L=11,M=12,N=13,O=14,P=15,Q=16,R=17,S=18,T=19
+- Para eliminar filas usar .filter()
+- Para modificar celdas: iterar y copiar con spread operator
+- Para duplicar: for loop con push a array de salida
+- Condiciones AND: ambas condiciones deben cumplirse
+- Condiciones OR: cualquiera de las condiciones
+- El código debe ser JavaScript válido para eval() en navegador moderno
+- No usar import, require ni APIs externas
+- Asegúrate de que el JSON sea válido: escapa comillas dentro del string fn`;
+
+async function callAI(userMessage,statusEl,spinEl){
+  if(statusEl){statusEl.className='interpret-status loading';statusEl.textContent='⟳ Interpretando con IA...';}
+  if(spinEl) spinEl.style.display='inline-block';
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        system:SYSTEM_PROMPT,
+        messages:[{role:'user',content:userMessage}]
+      })
+    });
+    if(!resp.ok) throw new Error('API '+resp.status);
+    const data=await resp.json();
+    const raw=data.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+    const clean=raw.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+    if(!parsed.fn||!parsed.text) throw new Error('Respuesta incompleta');
+    return parsed;
+  }catch(e){
+    if(statusEl){statusEl.className='interpret-status err';statusEl.textContent='✗ '+e.message;}
+    return null;
+  }finally{
+    if(spinEl) spinEl.style.display='none';
+  }
+}
+
+async function addRule(){
+  const input=document.getElementById('newRuleInput');
+  const text=input.value.trim();
+  if(!text) return;
+  const statusEl=document.getElementById('interpretStatus');
+  const btn=document.getElementById('addRuleBtn');
+  btn.disabled=true;
+  const result=await callAI(text,statusEl,null);
+  btn.disabled=false;
+  if(!result) return;
+  try{ eval('('+result.fn+')'); }
+  catch(e){ statusEl.className='interpret-status err'; statusEl.textContent='✗ Función inválida: '+e.message; return; }
+  rules.push({id:++nextId,text:result.text,badge:result.badge,type:result.type,enabled:true,fn:result.fn});
+  input.value='';
+  statusEl.className='interpret-status ok';
+  statusEl.textContent='✓ Regla añadida correctamente';
+  renderRules();
+  setTimeout(()=>{statusEl.textContent='';},3500);
+}
+
+async function reinterpretRule(id){
+  const rewriteEl=document.getElementById('rrewrite-'+id);
+  const text=rewriteEl.value.trim()||document.getElementById('rtxt-'+id).value.trim();
+  if(!text) return;
+  const statusEl=document.getElementById('istatus-'+id);
+  const spinEl=document.getElementById('spin-'+id);
+  const result=await callAI(text,statusEl,spinEl);
+  if(!result) return;
+  try{ eval('('+result.fn+')'); }
+  catch(e){ statusEl.className='interpret-status err'; statusEl.textContent='✗ Función inválida: '+e.message; return; }
+  const r=rules.find(r=>r.id===id);
+  if(r){r.text=result.text;r.badge=result.badge;r.type=result.type;r.fn=result.fn;}
+  statusEl.className='interpret-status ok';
+  statusEl.textContent='✓ Regla actualizada';
+  editingId=null;
+  renderRules();
+}
+
+// ═══════════════════ RUN ═══════════════════
+function updateRunSummary(){
+  const el=document.getElementById('runSummary');
+  const active=rules.filter(r=>r.enabled);
+  if(!uploadedFile){
+    el.innerHTML='<span style="color:var(--error)">⚠ No hay archivo cargado. Vuelve al paso ①</span>';
+    return;
+  }
+  el.innerHTML=`<span style="color:var(--accent)">${escHtml(uploadedFile.name)}</span><br><br>`+
+    active.map((r,i)=>`R${i+1}: ${escHtml(r.text)}`).join('<br>')+
+    `<br><br><span style="color:var(--muted)">Reglas activas: ${active.length} / ${rules.length} total</span>`;
+}
+
+function log(msg,type='info'){
+  document.getElementById('logBox').classList.add('on');
+  const d=document.createElement('div');
+  d.className='log-entry '+type;
+  const icons={ok:'✓',info:'→',warn:'⚠',err:'✗'};
+  d.innerHTML=`<span>${icons[type]}</span><span>${escHtml(msg)}</span>`;
+  document.getElementById('logEntries').appendChild(d);
+}
+
+function setProgress(p){
+  document.getElementById('progressBar').classList.add('on');
+  document.getElementById('progressFill').style.width=p+'%';
+}
+
+function processFile(){
+  if(!uploadedFile){alert('Primero carga un archivo en el paso ①');return;}
+  document.getElementById('logEntries').innerHTML='';
+  document.getElementById('statsGrid').style.display='none';
+  document.getElementById('downloadBtn').style.display='none';
+  document.getElementById('logBox').classList.remove('on');
+  workbookResult=null;
+  document.getElementById('processBtn').disabled=true;
+  setProgress(5);
+  const reader=new FileReader();
+  reader.onload=(e)=>{
+    try{
+      const data=new Uint8Array(e.target.result);
+      const wb=XLSX.read(data,{type:'array',cellDates:true});
+      setProgress(20);
+      const sheetName=wb.SheetNames[0];
+      const ws=wb.Sheets[sheetName];
+      let rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
+      const originalCount=rows.length;
+      log('Archivo: '+uploadedFile.name+' ('+originalCount+' filas)','info');
+      setProgress(30);
+      const active=rules.filter(r=>r.enabled);
+      const step=60/Math.max(active.length,1);
+      for(let i=0;i<active.length;i++){
+        const rule=active[i];
+        try{
+          const fn=eval('('+rule.fn+')');
+          const before=rows.length;
+          rows=fn(rows);
+          if(!Array.isArray(rows)) throw new Error('La función no devolvió un array');
+          const diff=rows.length-before;
+          const diffStr=diff>0?' (+'+diff+' filas)':diff<0?' ('+diff+' filas)':'';
+          log('R'+(i+1)+' ✓ '+rule.text+diffStr,'ok');
+        }catch(err){
+          log('R'+(i+1)+' ✗ Error: '+err.message,'err');
+        }
+        setProgress(30+(i+1)*step);
+      }
+      setProgress(95);
+      const outWs=XLSX.utils.aoa_to_sheet(rows,{cellDates:true});
+      const outWb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(outWb,outWs,sheetName);
+      workbookResult=outWb;
+      processedRows=rows;
+      setProgress(100);
+      const finalRows=rows.length-1;
+      document.getElementById('statsGrid').innerHTML=`
+        <div class="stat"><div class="stat-v">${originalCount}</div><div class="stat-l">Filas orig.</div></div>
+        <div class="stat"><div class="stat-v">${finalRows}</div><div class="stat-l">Filas final</div></div>
+        <div class="stat"><div class="stat-v">${active.length}</div><div class="stat-l">Reglas</div></div>`;
+      document.getElementById('statsGrid').style.display='grid';
+      document.getElementById('downloadBtn').style.display='flex';
+      document.getElementById('goLabelsBtn').style.display='flex';
+      log('Completado ✓','ok');
+    }catch(err){
+      log('Error: '+err.message,'err');
+    }
+    document.getElementById('processBtn').disabled=false;
+  };
+  reader.readAsArrayBuffer(uploadedFile);
+}
+
+function downloadFile(){
+  if(!workbookResult) return;
+  XLSX.writeFile(workbookResult,outputFilename);
+  log('Descargado: '+outputFilename,'ok');
+}
+
+// ═══════════════════ LABELS ═══════════════════
+let processedRows = null; // store rows after processing
+
+function generateLabels() {
+  const logoSrc = document.getElementById('logoImg').src;
+  const company = document.getElementById('lbl-company').value || 'Deskans';
+  const source = document.getElementById('lbl-source').value;
+
+  let rows = null;
+  if (source === 'processed' && processedRows) {
+    rows = processedRows;
+  } else if (source === 'original' && uploadedFile) {
+    alert('Para usar el original, primero procésalo en el paso ③ (se usa la misma fuente).');
+    return;
+  } else if (processedRows) {
+    rows = processedRows;
+  } else {
+    alert('Primero procesa el Excel en el paso ③');
+    return;
+  }
+
+  // Col indices: A=0(Num factura), B=1(Fecha), F=5(Contacto), K=10(SKU), L=11(Item), P=15(Unidades)
+  const dataRows = rows.slice(1).filter(r => r.some(c => c != null && String(c).trim() !== ''));
+
+  const preview = document.getElementById('labelPreview');
+  preview.innerHTML = '';
+
+  if (dataRows.length === 0) {
+    preview.innerHTML = '<div style="text-align:center;color:var(--error);font-size:12px;padding:40px 0">No hay datos para generar etiquetas</div>';
+    return;
+  }
+
+  const sheetsNeeded = Math.ceil(dataRows.length / 6);
+  document.getElementById('labelCountInfo').textContent =
+    `${dataRows.length} etiquetas · ${sheetsNeeded} hoja${sheetsNeeded>1?'s':''} A4`;
+
+  for (let s = 0; s < sheetsNeeded; s++) {
+    const sheet = document.createElement('div');
+    sheet.className = 'label-sheet';
+
+    for (let i = 0; i < 6; i++) {
+      const rowIdx = s * 6 + i;
+      const cell = document.createElement('div');
+
+      if (rowIdx >= dataRows.length) {
+        cell.className = 'label-cell empty';
+        sheet.appendChild(cell);
+        continue;
+      }
+
+      const r = dataRows[rowIdx];
+      const albaran = r[0] != null ? String(r[0]).trim() : '';
+      const fecha = r[1] != null ? String(r[1]).substring(0, 10) : '';
+      const contacto = r[5] != null ? String(r[5]).trim() : '';
+      const item = r[11] != null ? String(r[11]).trim() : '';
+      const units = r[15] != null ? String(r[15]).trim() : '1';
+
+      cell.className = 'label-cell';
+      cell.innerHTML = `
+        <div>
+          <div class="lbl-top-row"><img class="lbl-logo" src="${logoSrc}" alt="logo"><div class="lbl-company">${escHtml(company)}</div></div>
+          <div class="lbl-contact">${escHtml(contacto)}</div>
+          <div class="lbl-item">${escHtml(item)}</div>
+        </div>
+        <div class="lbl-footer">
+          <div>
+            <div class="lbl-albaran">${escHtml(albaran)}</div>
+            <div class="lbl-fecha">${escHtml(fecha)}</div>
+          </div>
+          <div class="lbl-right">
+            <div class="lbl-units">${escHtml(units)}</div>
+            <div class="lbl-units-label">Unidades</div>
+          </div>
+        </div>`;
+      sheet.appendChild(cell);
+    }
+    preview.appendChild(sheet);
+  }
+}
+
+
+// ═══════════════════ HOLDED ═══════════════════
+let holdedKey = '';
+let ordersData = [];
+let selectedOrders = new Set();
+
+async function connectHolded() {
+  holdedKey = document.getElementById('holdedApiKey').value.trim();
+  if (!holdedKey) return;
+  const status = document.getElementById('holdedStatus');
+  status.className = 'holded-status loading';
+  status.textContent = '⟳ Conectando con Holded...';
+
+  try {
+    const resp = await fetch('https://sxpnhxbobraljcdldwki.supabase.co/functions/v1/holded', {
+      headers: { 'key': holdedKey }
+    });
+    if (!resp.ok) throw new Error('Error ' + resp.status + ' — revisa la API Key');
+    const data = await resp.json();
+    status.className = 'holded-status ok';
+    status.textContent = '✓ Conectado correctamente';
+    document.getElementById('holdedOrdersSection').style.display = 'block';
+    renderOrders(data);
+  } catch(e) {
+    status.className = 'holded-status err';
+    status.textContent = '✗ ' + e.message;
+  }
+}
+
+async function loadOrders() {
+  if (!holdedKey) return;
+  const status = document.getElementById('holdedStatus');
+  status.className = 'holded-status loading';
+  status.textContent = '⟳ Actualizando pedidos...';
+  try {
+    const resp = await fetch('https://sxpnhxbobraljcdldwki.supabase.co/functions/v1/holded', {
+      headers: { 'key': holdedKey }
+    });
+    if (!resp.ok) throw new Error('Error ' + resp.status);
+    const data = await resp.json();
+    status.className = 'holded-status ok';
+    status.textContent = '✓ Actualizado';
+    renderOrders(data);
+  } catch(e) {
+    status.className = 'holded-status err';
+    status.textContent = '✗ ' + e.message;
+  }
+}
+
+function renderOrders(data) {
+  ordersData = Array.isArray(data) ? data : (data.docs || data.data || []);
+  selectedOrders = new Set();
+  const list = document.getElementById('ordersList');
+  list.innerHTML = '';
+
+  if (ordersData.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:13px;padding:30px 0">No hay pedidos pendientes</div>';
+    document.getElementById('ordersCount').textContent = '0 pedidos';
+    document.getElementById('convertBtn').disabled = true;
+    return;
+  }
+
+  document.getElementById('ordersCount').textContent = ordersData.length + ' pedido' + (ordersData.length !== 1 ? 's' : '');
+
+  ordersData.forEach((order, idx) => {
+    const card = document.createElement('div');
+    card.className = 'order-card';
+    card.onclick = () => toggleOrder(order.id || order._id, idx);
+
+    const date = order.date ? new Date(order.date * 1000).toLocaleDateString('es-ES') : '';
+    const amount = order.total != null ? Number(order.total).toFixed(2) + ' €' : '';
+    const contact = order.contactName || order.contact || '';
+    const docNum = order.docNumber || order.number || order.id || '';
+
+    card.innerHTML = 
+      '<div class="order-check" id="check-' + idx + '"></div>' +
+      '<div class="order-info">' +
+        '<div class="order-num">' + escHtml(String(docNum)) + '</div>' +
+        '<div class="order-contact">' + escHtml(contact) + '</div>' +
+        '<div class="order-meta">' + escHtml(date) + '</div>' +
+      '</div>' +
+      '<div class="order-amount">' + escHtml(amount) + '</div>';
+    card.id = 'order-card-' + idx;
+    list.appendChild(card);
+  });
+}
+
+function toggleOrder(id, idx) {
+  const card = document.getElementById('order-card-' + idx);
+  const check = document.getElementById('check-' + idx);
+  if (selectedOrders.has(id)) {
+    selectedOrders.delete(id);
+    card.classList.remove('selected');
+    check.textContent = '';
+  } else {
+    selectedOrders.add(id);
+    card.classList.add('selected');
+    check.textContent = '✓';
+  }
+  document.getElementById('convertBtn').disabled = selectedOrders.size === 0;
+}
+
+function toggleSelectAll() {
+  if (selectedOrders.size === ordersData.length) {
+    selectedOrders = new Set();
+    document.querySelectorAll('.order-card').forEach((c,i) => {
+      c.classList.remove('selected');
+      document.getElementById('check-' + i).textContent = '';
+    });
+  } else {
+    ordersData.forEach((o, i) => {
+      const id = o.id || o._id;
+      selectedOrders.add(id);
+      const card = document.getElementById('order-card-' + i);
+      card.classList.add('selected');
+      document.getElementById('check-' + i).textContent = '✓';
+    });
+  }
+  document.getElementById('convertBtn').disabled = selectedOrders.size === 0;
+}
+
+async function convertOrders() {
+  if (!holdedKey || selectedOrders.size === 0) return;
+  const btn = document.getElementById('convertBtn');
+  btn.disabled = true;
+  btn.textContent = '⟳ Convirtiendo...';
+  const resultBox = document.getElementById('convertResult');
+  resultBox.innerHTML = '';
+  resultBox.classList.add('on');
+
+  for (const id of selectedOrders) {
+    const order = ordersData.find(o => (o.id || o._id) === id);
+    const docNum = order ? (order.docNumber || order.number || id) : id;
+    try {
+      const resp = await fetch('https://sxpnhxbobraljcdldwki.supabase.co/functions/v1/holded', {
+        method: 'POST',
+        headers: { 'x-holded-key': holdedKey, 'x-holded-path': '/api/invoicing/v1/documents/salesorder/' + id + '/ship', 'x-holded-method': 'POST', 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      if (!resp.ok) throw new Error('Error ' + resp.status);
+      const entry = document.createElement('div');
+      entry.className = 'convert-entry ok';
+      entry.innerHTML = '<span>✓</span><span>Pedido ' + escHtml(String(docNum)) + ' convertido en albarán</span>';
+      resultBox.appendChild(entry);
+    } catch(e) {
+      const entry = document.createElement('div');
+      entry.className = 'convert-entry err';
+      entry.innerHTML = '<span>✗</span><span>Pedido ' + escHtml(String(docNum)) + ': ' + escHtml(e.message) + '</span>';
+      resultBox.appendChild(entry);
+    }
+  }
+
+  btn.textContent = '📦 Convertir seleccionados en albarán';
+  btn.disabled = false;
+  loadOrders();
+}
+
+// ═══════════════════ INIT ═══════════════════
+renderRules();
+renderExamples();
+</script>
+</body>
+</html>
