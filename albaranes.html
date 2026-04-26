@@ -782,7 +782,9 @@ async function connectHolded() {
 
   try {
     const resp = await fetch('https://sxpnhxbobraljcdldwki.supabase.co/functions/v1/holded', {
-      headers: { 'key': holdedKey }
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-holded-key': holdedKey, 'x-holded-path': '/api/invoicing/v1/documents/salesorder', 'x-holded-method': 'GET' },
+      body: JSON.stringify({})
     });
     if (!resp.ok) throw new Error('Error ' + resp.status + ' — revisa la API Key');
     const data = await resp.json();
@@ -803,7 +805,9 @@ async function loadOrders() {
   status.textContent = '⟳ Actualizando pedidos...';
   try {
     const resp = await fetch('https://sxpnhxbobraljcdldwki.supabase.co/functions/v1/holded', {
-      headers: { 'key': holdedKey }
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-holded-key': holdedKey, 'x-holded-path': '/api/invoicing/v1/documents/salesorder', 'x-holded-method': 'GET' },
+      body: JSON.stringify({})
     });
     if (!resp.ok) throw new Error('Error ' + resp.status);
     const data = await resp.json();
